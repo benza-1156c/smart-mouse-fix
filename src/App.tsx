@@ -1,5 +1,10 @@
 import { createSignal, onMount, onCleanup } from "solid-js";
 import { invoke } from "@tauri-apps/api/core";
+import {
+  enable as enableAutostart,
+  disable as disableAutostart,
+  isEnabled as isAutostartEnabled,
+} from "@tauri-apps/plugin-autostart";
 import { Header } from "./components/Header";
 import { LearningProgress } from "./components/LearningProgress";
 import { ClickTarget } from "./components/ClickTarget";
@@ -25,12 +30,34 @@ function App() {
   const [ripples, setRipples] = createSignal<Ripple[]>([]);
   const [isClickActive, setIsClickActive] = createSignal(false);
   const [isBlockedFlash, setIsBlockedFlash] = createSignal(false);
-  const [blockedAlertMsg, setBlockedAlertMsg] = createSignal<string | null>(
-    null,
-  );
+  const [blockedAlertMsg, setBlockedAlertMsg] = createSignal<string | null>(null);
+  const [autostartEnabled, setAutostartEnabled] = createSignal(false);
 
   let lastBlockedCount = 0;
   let alertTimeout: number | undefined;
+
+  async function checkAutostart() {
+    try {
+      const active = await isAutostartEnabled();
+      setAutostartEnabled(active);
+    } catch {
+      // Running outside Tauri or in preview
+    }
+  }
+
+  async function handleToggleAutostart() {
+    try {
+      if (autostartEnabled()) {
+        await disableAutostart();
+        setAutostartEnabled(false);
+      } else {
+        await enableAutostart();
+        setAutostartEnabled(true);
+      }
+    } catch (err) {
+      console.error("Autostart toggle failed:", err);
+    }
+  }
 
   async function fetchStats() {
     try {
@@ -95,6 +122,7 @@ function App() {
   }
 
   onMount(() => {
+    checkAutostart();
     fetchStats();
     const timer = setInterval(fetchStats, 100);
     onCleanup(() => {
@@ -114,6 +142,8 @@ function App() {
       <Header
         isComplete={isComplete()}
         isAdaptive={stats().is_adaptive}
+        autostartEnabled={autostartEnabled()}
+        onToggleAutostart={handleToggleAutostart}
         onReset={handleReset}
       />
 

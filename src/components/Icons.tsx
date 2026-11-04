@@ -154,3 +154,22 @@ export function ActivityIcon(props: { size?: number; class?: string }) {
   );
 }
 
+export function PowerIcon(props: { size?: number; class?: string }) {
+  const s = props.size ?? 16;
+  return (
+    <svg
+      width={s}
+      height={s}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="1.8"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      class={props.class}
+    >
+      <path d="M18.36 6.64a9 9 0 1 1-12.73 0" />
+      <line x1="12" y1="2" x2="12" y2="12" />
+    </svg>
+  );
+}

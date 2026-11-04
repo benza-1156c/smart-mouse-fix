@@ -1,11 +1,13 @@
 import { Show } from "solid-js";
-import { MouseIcon, RefreshIcon } from "./Icons";
+import { MouseIcon, PowerIcon, RefreshIcon } from "./Icons";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
 interface HeaderProps {
   isComplete: boolean;
   isAdaptive: boolean;
+  autostartEnabled: boolean;
+  onToggleAutostart: () => void;
   onReset: () => void;
 }
 
@@ -28,6 +30,7 @@ export function Header(props: HeaderProps) {
               v0.1.0
             </Badge>
           </div>
+          <p class="mt-1 text-xs text-muted-foreground">Adaptive Hardware Debounce & Click Calibration</p>
         </div>
       </div>
 
@@ -47,10 +50,22 @@ export function Header(props: HeaderProps) {
         </Show>
 
         <Button
+          variant={props.autostartEnabled ? "secondary" : "outline"}
+          size="sm"
+          onClick={props.onToggleAutostart}
+          type="button"
+          title="เปิด/ปิดการเริ่มโปรแกรมอัตโนมัติพร้อม Windows (ซ่อนใน System Tray)"
+        >
+          <PowerIcon size={14} />
+          <span>เริ่มพร้อม Windows: {props.autostartEnabled ? "เปิด" : "ปิด"}</span>
+        </Button>
+
+        <Button
           variant="outline"
           size="sm"
           onClick={props.onReset}
           type="button"
+          title="ล้างสถิติและเริ่มวอมอัปใหม่"
         >
           <RefreshIcon size={14} />
           <span>รีเซ็ต</span>
