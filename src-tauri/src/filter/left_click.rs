@@ -137,6 +137,11 @@ impl LeftClickFilter {
         if new_distance > 1.0 {
             return false;
         }
+
+        if new_interval < 60.0 {
+            return true;
+        }
+
         new_interval < self.current_limit()
     }
 }
