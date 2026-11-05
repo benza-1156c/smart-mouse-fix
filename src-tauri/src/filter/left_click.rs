@@ -75,6 +75,10 @@ impl LeftClickFilter {
     }
 
     pub fn push_stat(&mut self, stat: ClickStat) {
+        if stat.interval_ms > 400.0 {
+            return;
+        }
+
         if self.buffer.len() == self.capacity {
             self.buffer.pop_front();
         }
@@ -116,32 +120,25 @@ impl LeftClickFilter {
     }
 
     /// The dynamic threshold below which a click is considered hardware bounce.
-    /// Returns the fixed baseline (85 ms) until enough samples are collected.
+    /// Returns the baseline (75 ms) until enough rapid click samples are collected.
     pub fn current_limit(&self) -> f64 {
         if self.buffer.len() < 10 {
-            return 85.0;
+            return 75.0;
         }
         let mean = self.mean_interval();
         let sd = self.std_dev_interval(mean).max(1.0);
-        (mean - 2.5 * sd).max(5.0)
+
+        (mean - 2.5 * sd).clamp(55.0, 110.0)
     }
 
     // ── Decision ─────────────────────────────────────────────────
 
     /// Returns `true` when `new_interval` looks like a hardware switch
     /// bounce rather than an intentional click.
-    ///
-    /// A click that moved more than 1 px is never considered a bounce
-    /// (the user physically moved the cursor between clicks).
     pub fn is_hardware_bounce(&self, new_interval: f64, new_distance: f64) -> bool {
-        if new_distance > 1.0 {
+        if new_distance > 10.0 {
             return false;
         }
-
-        if new_interval < 60.0 {
-            return true;
-        }
-
         new_interval < self.current_limit()
     }
 }

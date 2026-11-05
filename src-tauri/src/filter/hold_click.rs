@@ -99,6 +99,7 @@ impl HoldClickFilter {
     ///
     /// If the button was released for a micro-interval (< 50ms) and distance is minimal,
     /// it indicates hardware switch chatter breaking contact during a drag.
+    #[allow(dead_code)]
     pub fn is_drag_bounce(&self, release_interval_ms: f64, distance_px: f64) -> bool {
         distance_px <= 2.0 && release_interval_ms < 50.0
     }

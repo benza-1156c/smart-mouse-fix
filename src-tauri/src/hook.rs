@@ -1,3 +1,4 @@
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{LazyLock, Mutex};
 use std::time::Instant;
 
@@ -31,6 +32,8 @@ pub static BUTTON_DOWN_STATE: LazyLock<Mutex<Option<(Instant, (i32, i32))>>> =
 pub static LAST_UP: LazyLock<Mutex<Option<(Instant, (i32, i32), f64)>>> =
     LazyLock::new(|| Mutex::new(None));
 
+pub static SWALLOW_NEXT_UP: AtomicBool = AtomicBool::new(false);
+
 unsafe extern "system" fn mouse_hook_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     if code == HC_ACTION as i32 {
         let msg = wparam.0 as u32;
@@ -41,28 +44,31 @@ unsafe extern "system" fn mouse_hook_proc(code: i32, wparam: WPARAM, lparam: LPA
             let now = Instant::now();
             let pos = (hook_struct.pt.x, hook_struct.pt.y);
 
-            // Check for hold/drag drop bounce:
-            // If the user was holding/dragging (> 150ms) and the switch chattered open
-            // and closed within 50ms, the contact bounced during a drag.
             {
                 let last_up = LAST_UP.lock().unwrap();
-                let mut hold_filter = HOLD_FILTER.lock().unwrap();
-
                 if let Some((up_time, up_pos, hold_duration)) = *last_up {
                     let release_interval = now.duration_since(up_time).as_millis() as f64;
                     let dx = (pos.0 - up_pos.0) as f64;
                     let dy = (pos.1 - up_pos.1) as f64;
                     let dist = (dx * dx + dy * dy).sqrt();
 
-                    if hold_duration >= 150.0 && hold_filter.is_drag_bounce(release_interval, dist)
-                    {
-                        hold_filter.total_drops_prevented += 1;
-                        hold_filter.save();
+                    if release_interval < 35.0 && dist <= 10.0 {
+                        if hold_duration >= 150.0 {
+                            let mut hold_filter = HOLD_FILTER.lock().unwrap();
+                            hold_filter.total_drops_prevented += 1;
+                            hold_filter.save();
+                        } else {
+                            let mut filter = FILTER.lock().unwrap();
+                            filter.record_interval(release_interval);
+                            filter.total_blocked += 1;
+                            filter.save();
+                        }
+                        SWALLOW_NEXT_UP.store(true, Ordering::SeqCst);
+                        return LRESULT(1);
                     }
                 }
             }
 
-            // Normal left-click debounce logic:
             let mut last = LAST_CLICK.lock().unwrap();
             let mut filter = FILTER.lock().unwrap();
 
@@ -77,7 +83,8 @@ unsafe extern "system" fn mouse_hook_proc(code: i32, wparam: WPARAM, lparam: LPA
                 if filter.is_hardware_bounce(interval, distance) {
                     filter.total_blocked += 1;
                     filter.save();
-                    return LRESULT(1); // swallow the bounced click
+                    SWALLOW_NEXT_UP.store(true, Ordering::SeqCst);
+                    return LRESULT(1);
                 }
 
                 filter.total_clicks += 1;
@@ -92,8 +99,11 @@ unsafe extern "system" fn mouse_hook_proc(code: i32, wparam: WPARAM, lparam: LPA
             *BUTTON_DOWN_STATE.lock().unwrap() = Some((now, pos));
         }
 
-        // ── 2. Left-click up (Hold-click release) ─────────────────
         if msg == WM_LBUTTONUP {
+            if SWALLOW_NEXT_UP.swap(false, Ordering::SeqCst) {
+                return LRESULT(1);
+            }
+
             let hook_struct = unsafe { *(lparam.0 as *const MSLLHOOKSTRUCT) };
             let now = Instant::now();
             let pos = (hook_struct.pt.x, hook_struct.pt.y);

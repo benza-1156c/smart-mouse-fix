@@ -1,6 +1,9 @@
 use serde::Serialize;
+use std::sync::atomic::Ordering;
 
-use crate::hook::{FILTER, HOLD_FILTER, LAST_CLICK, LAST_UP};
+use crate::hook::{
+    BUTTON_DOWN_STATE, FILTER, HOLD_FILTER, LAST_CLICK, LAST_UP, SWALLOW_NEXT_UP,
+};
 
 #[tauri::command]
 pub fn greet(name: &str) -> String {
@@ -44,7 +47,12 @@ pub fn reset_mouse_stats() -> FilterStatus {
     {
         let mut filter = FILTER.lock().unwrap();
         let mut last_click = LAST_CLICK.lock().unwrap();
+        let mut last_up = LAST_UP.lock().unwrap();
+        let mut down_state = BUTTON_DOWN_STATE.lock().unwrap();
         *last_click = None;
+        *last_up = None;
+        *down_state = None;
+        SWALLOW_NEXT_UP.store(false, Ordering::SeqCst);
         filter.reset();
         filter.save();
     }
@@ -81,7 +89,9 @@ pub fn reset_hold_stats() -> HoldFilterStatus {
     {
         let mut filter = HOLD_FILTER.lock().unwrap();
         let mut last_up = LAST_UP.lock().unwrap();
+        let mut down_state = BUTTON_DOWN_STATE.lock().unwrap();
         *last_up = None;
+        *down_state = None;
         filter.reset();
         filter.save();
     }
